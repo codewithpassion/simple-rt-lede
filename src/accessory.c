@@ -30,15 +30,6 @@
 
 #include "networkmanager.h"
 
-typedef struct accessory_t
-{
-    uint8_t ep_in;
-    uint8_t ep_out;
-    accessory_id_t id;
-    volatile bool is_running;
-    struct libusb_device_handle *handle;
-} accessory_t;
-
 static struct
 {
     bool used;
@@ -109,7 +100,7 @@ static bool store_accessory_id(accessory_t *acc, accessory_id_t id)
     return true;
 }
 
-static accessory_t *find_accessory_by_id(accessory_id_t id)
+accessory_t *find_accessory_by_id(accessory_id_t id)
 {
     accessory_t *ret;
 
@@ -156,7 +147,7 @@ static void accessory_worker_proc(accessory_t *acc)
         {
             if ((id = get_acc_id_from_packet(acc_buf, nread, false)) != 0)
             {
-                printf(" %i\n", id);
+                printf("IIIIIIIIIIIIIIID %i", id);
                 store_accessory_id(acc, id);
                 break;
             }

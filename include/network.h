@@ -36,16 +36,39 @@
 #define IP_MAXPACKET 65535
 #define BUF_SIZ 1024
 
+
+#define SIMPLERT_NETWORK_ADDRESS_BUILDER(a, b, c, d) ( \
+    (uint32_t)((a) << 24) |                            \
+    (uint32_t)((b) << 16) |                            \
+    (uint32_t)((c) << 8) |                             \
+    (uint32_t)((d) << 0))
+
+#define SIMPLERT_NETWORK_ADDRESS \
+        SIMPLERT_NETWORK_ADDRESS_BUILDER(10, 1, 1, 0)
+
+#define NETWORK_ADDRESS(addr) \
+        ((addr)&0xffffff00)
+
+#define ACC_ID_FROM_ADDR(addr) \
+        ((addr)&0xff)
+
+
 bool start_network(void);
 void stop_network(void);
 
 ssize_t send_network_packet(const uint8_t *data, size_t size);
 
+accessory_id_t get_acc_id_from_packet_offset(const uint8_t *data,
+        size_t size, int offset, bool checkV4);
 accessory_id_t get_acc_id_from_packet(const uint8_t *data,
         size_t size, bool dst_addr);
 
+accessory_id_t get_acc_id_from_address(const uint8_t *data, size_t size);
+
 char *fill_serial_param(char *buf, size_t size,
         accessory_id_t acc_id);
+
+
 
 
 #endif

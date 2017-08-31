@@ -34,27 +34,13 @@
 
 #define PLATFORM "linux"
 
-#define SIMPLERT_NETWORK_ADDRESS_BUILDER(a, b, c, d) ( \
-    (uint32_t)((a) << 24) |                            \
-    (uint32_t)((b) << 16) |                            \
-    (uint32_t)((c) << 8) |                             \
-    (uint32_t)((d) << 0))
-
-#define SIMPLERT_NETWORK_ADDRESS \
-    SIMPLERT_NETWORK_ADDRESS_BUILDER(10, 1, 1, 0)
-
-#define NETWORK_ADDRESS(addr) \
-    ((addr)&0xffffff00)
-
-#define ACC_ID_FROM_ADDR(addr) \
-    ((addr)&0xff)
-
 #define IFACE_UP_SH_PATH "iface_up.sh"
 
 /* tun stuff */
 static int g_tun_fd = 0;
 static pthread_t g_tun_thread;
 static volatile bool g_tun_is_running = false;
+static char g_tun_ip[32] = {0};
 
 void _printIp(char *msg, void *addr)
 {
@@ -74,13 +60,14 @@ static inline void dump_addr_info(uint32_t addr, size_t size)
            addr & 0xff);
 }
 
-accessory_id_t get_acc_id_from_packet(const uint8_t *data, size_t size, bool dst_addr)
+
+accessory_id_t get_acc_id_from_packet_offset(const uint8_t *data, size_t size, int offset, bool checkV4)
 {
     uint32_t addr;
-    unsigned int addr_offset = (dst_addr ? 16 : 12);
+    unsigned int addr_offset = offset;
 
     /* only ipv4 supported */
-    if (size < 20 || ((*data >> 4) & 0xf) != 4)
+    if (checkV4 && (size < 20 || ((*data >> 4) & 0xf) != 4))
     {
         goto end;
     }
@@ -92,6 +79,8 @@ accessory_id_t get_acc_id_from_packet(const uint8_t *data, size_t size, bool dst
         (uint32_t)(data[addr_offset + 2] << 8) |
         (uint32_t)(data[addr_offset + 3] << 0);
 
+printf("\n@@@@@@@@@@@@ offset %i @@@ %u\n", addr_offset, addr);
+
     if (NETWORK_ADDRESS(addr) == SIMPLERT_NETWORK_ADDRESS)
     {
         /* dump_addr_info(addr, size); */
@@ -100,6 +89,34 @@ accessory_id_t get_acc_id_from_packet(const uint8_t *data, size_t size, bool dst
 
 end:
     return 0;
+}
+
+accessory_id_t get_acc_id_from_address(const uint8_t *data, size_t size)
+{
+    uint32_t addr;
+    /* dest ip addr in LE */
+    addr =
+        (uint32_t)(data[0] << 24) |
+        (uint32_t)(data[1] << 16) |
+        (uint32_t)(data[2] << 8) |
+        (uint32_t)(data[3] << 0);
+
+    printf("\n@@@@@@@@@@@@@@ %u\n", addr);
+
+    if (NETWORK_ADDRESS(addr) == SIMPLERT_NETWORK_ADDRESS)
+    {
+        /* dump_addr_info(addr, size); */
+        return ACC_ID_FROM_ADDR(addr);
+    }
+
+end:
+    return 0;
+}
+
+accessory_id_t get_acc_id_from_packet(const uint8_t *data, size_t size, bool dst_addr)
+{
+    unsigned int addr_offset = (dst_addr ? 16 : 12);
+    return get_acc_id_from_packet_offset(data, size, addr_offset, true);
 }
 
 static void *tun_thread_proc(void *arg)

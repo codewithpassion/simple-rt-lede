@@ -55,7 +55,7 @@ void printIp(char *msg, void *addr)
 
     ((struct sockaddr_in *)&their_addr)->sin_addr.s_addr = addr;
     inet_ntop(AF_INET, &((struct sockaddr_in *)&their_addr)->sin_addr, sender, sizeof sender);
-    // printf("%s IP: %s", msg, sender);
+    printf("%s IP: %s", msg, sender);
 }
 
 ssize_t wrapIPpackageInEthernet(uint8_t *acc_buf, size_t size, uint8_t *sendbuf)
@@ -152,20 +152,68 @@ static void reportArp(uint8_t *acc_buf, size_t size)
 
 void handleArpRequest(uint8_t *acc_buf, size_t size, int tunnelDev)
 {
-    
-    // reportArp(acc_buf, size);
+    // int id = 0;
     
     int frame_length = 6 + 6 + 2 + ARP_HDRLEN;
-    arp_hdr *sourceArpRequest = (arp_hdr *)(acc_buf + 6 + 6 + 2);
+    arp_hdr *sourceArpRequest = (arp_hdr *)(acc_buf + 14 );
     arp_hdr arphdr_resp;
-
+    
     uint8_t *ether_frame;
+    
+    int id = get_acc_id_from_address(sourceArpRequest->target_ip, 4 * sizeof(uint8_t));
+    if (id != 0 ) {
+        printf("\nLooking for %i\n", id);
+        accessory_t *acc = find_accessory_by_id(id);
+        if (acc == 0) { return; }
+        printf("\nGot %u\n", (unsigned int)acc);
+        if (!acc->is_running) {
+            printf("Not for me\n");
+            return;
+        }
+    }
+    else {
+        return;
+    }
     ether_frame = allocate_ustrmem(frame_length);
-
     memcpy(&arphdr_resp.sender_mac, g_sourceInterfaceMac.ifr_hwaddr.sa_data, 6 * sizeof(uint8_t));
     memcpy(&arphdr_resp.sender_ip, sourceArpRequest->target_ip, 4 * sizeof(uint8_t));
     memcpy(&arphdr_resp.target_mac, sourceArpRequest->sender_mac, 6 * sizeof(uint8_t));
     memcpy(&arphdr_resp.target_ip, sourceArpRequest->sender_ip, 4 * sizeof(uint8_t));
+
+    // int id = get_acc_id_from_packet(arpIph, nread, true);
+    char ipAddr[32];
+    /* dest ip addr in LE */
+    uint32_t addr =
+        (uint32_t)(arphdr_resp.sender_ip[0] << 24) |
+        (uint32_t)(arphdr_resp.sender_ip[1] << 16) |
+        (uint32_t)(arphdr_resp.sender_ip[2] << 8) |
+        (uint32_t)(arphdr_resp.sender_ip[3] << 0);
+
+    printf("\n############ %u\n", addr);
+
+    sprintf(ipAddr, "%u.%u.%u.%u",
+        arphdr_resp.sender_ip[0],
+        arphdr_resp.sender_ip[1],
+        arphdr_resp.sender_ip[2],
+        arphdr_resp.sender_ip[3]);
+    printf("Source %s\n", ipAddr);
+
+    if (NETWORK_ADDRESS(addr) == SIMPLERT_NETWORK_ADDRESS)
+    {
+        printf("ID %i", id);
+        /* dump_addr_info(addr, size); */
+        id = ACC_ID_FROM_ADDR(addr);
+        if (id == 0) {
+            return; // early return as this request is not for us;
+        }
+    }
+
+    // sprintf(ipAddr, "%u.%u.%u.%u", 
+    //     arphdr_resp.sender_ip[0], 
+    //     arphdr_resp.sender_ip[1], 
+    //     arphdr_resp.sender_ip[2], 
+    //     arphdr_resp.sender_ip[3]);
+    // printf("Source %s\n", ipAddr);
 
     // for (i = 0; i < 6; i++)
     // {

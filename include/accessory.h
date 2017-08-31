@@ -22,7 +22,15 @@
 #include <stdint.h>
 #include <libusb.h>
 typedef uint32_t accessory_id_t;
-typedef struct accessory_t accessory_t;
+// typedef struct accessory_t accessory_t;
+typedef struct accessory_t
+{
+        uint8_t ep_in;
+        uint8_t ep_out;
+        accessory_id_t id;
+        volatile bool is_running;
+        struct libusb_device_handle *handle;
+} accessory_t;
 
 accessory_t *new_accessory(struct libusb_device_handle *handle,
         uint8_t ep_in, uint8_t ep_out);
@@ -36,6 +44,6 @@ void run_usb_probe_thread_detached(struct libusb_device *dev);
 
 accessory_id_t gen_new_serial_string(char *str, size_t size);
 
-// static accessory_t *find_accessory_by_id(accessory_id_t id);
+accessory_t *find_accessory_by_id(accessory_id_t id);
 
 #endif
