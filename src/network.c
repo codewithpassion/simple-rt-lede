@@ -104,14 +104,27 @@ static void *tun_thread_proc(void *arg)
     {
         if ((nread = tun_read_ip_packet(g_tun_fd, acc_buf, sizeof(acc_buf))) > 0)
         {
-            if ((id = get_acc_id_from_packet(acc_buf, nread, true)) != 0)
+
+            // FROM DEVICE
+            printf("#### Size: %i\n", nread);
+            int headerLength = sizeof(struct ether_header);
+            int size = nread - headerLength;
+            uint8_t ipPackage[size];
+            for (int i = 0; i < size; i++)
             {
-                send_accessory_packet(acc_buf, nread, id);
+                ipPackage[i] = acc_buf[i + headerLength];
             }
-            else
-            {
-                /* invalid packet received, ignore */
+
+            for (int accId = 2; accId < 255; accId++ ) {
+                send_accessory_packet(ipPackage, size, accId);
             }
+            // if ((id = get_acc_id_from_packet(ipPackage, size, true)) != 0)
+            // {
+            // }
+            // else
+            // {
+            //     /* invalid packet received, ignore */
+            // }
         }
         else if (nread < 0)
         {

@@ -144,7 +144,7 @@ static void accessory_worker_proc(accessory_t *acc)
     accessory_id_t id = 0;
     ssize_t nread;
 
-    puts("accessory connected!");
+    printf("accessory connected!");
 
     acc->is_running = true;
 
@@ -156,6 +156,7 @@ static void accessory_worker_proc(accessory_t *acc)
         {
             if ((id = get_acc_id_from_packet(acc_buf, nread, false)) != 0)
             {
+                printf(" %i\n", id);
                 store_accessory_id(acc, id);
                 break;
             }
@@ -178,6 +179,7 @@ static void accessory_worker_proc(accessory_t *acc)
         {
             uint8_t sendBuffer[nread + sizeof(struct ether_header)];
             ssize_t ethSize;
+            // TO DEVICE
             // printf("IP size: %i - ETH size: %i", nread, ethSize);
             if ((ethSize = wrapIPpackageInEthernet(acc_buf, nread, &sendBuffer)) > 0)
             {
@@ -185,7 +187,6 @@ static void accessory_worker_proc(accessory_t *acc)
                 printpacket("ETH", &sendBuffer, ethSize);
                 if (send_network_packet(sendBuffer, ethSize) < 0)
                 {
-                    puts("x");
                     break;
                 }
             }
