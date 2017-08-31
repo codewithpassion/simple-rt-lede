@@ -180,11 +180,8 @@ static void accessory_worker_proc(accessory_t *acc)
             uint8_t sendBuffer[nread + sizeof(struct ether_header)];
             ssize_t ethSize;
             // TO DEVICE
-            // printf("IP size: %i - ETH size: %i", nread, ethSize);
             if ((ethSize = wrapIPpackageInEthernet(acc_buf, nread, &sendBuffer)) > 0)
             {
-                printf("IP size: %i - ETH size: %i\n", nread, ethSize);
-                printpacket("ETH", &sendBuffer, ethSize);
                 if (send_network_packet(sendBuffer, ethSize) < 0)
                 {
                     break;

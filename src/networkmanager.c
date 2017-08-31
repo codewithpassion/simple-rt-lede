@@ -55,25 +55,24 @@ void printIp(char *msg, void *addr)
 
     ((struct sockaddr_in *)&their_addr)->sin_addr.s_addr = addr;
     inet_ntop(AF_INET, &((struct sockaddr_in *)&their_addr)->sin_addr, sender, sizeof sender);
-    printf("%s IP: %s", msg, sender);
+    // printf("%s IP: %s", msg, sender);
 }
 
 ssize_t wrapIPpackageInEthernet(uint8_t *acc_buf, size_t size, uint8_t *sendbuf)
 {
-
     struct iphdr *iph = (struct iphdr *)(acc_buf);
-
-    printIp("Source", iph->saddr);
-    printIp(" - Destination", iph->daddr);
-    puts("");
-
+    
+    // printIp("Source", iph->saddr);
+    // printIp(" - Destination", iph->daddr);
+    // puts("");
+    
     if (g_haveSourceMac == 0) {
         g_sourceInterfaceMac = getAddrMac("tap0");
         g_destinationInterfaceMac = getAddrMac("br-lan");
         g_haveSourceMac = 1;
     }
-
-    uint8_t buffSize = size + (sizeof(struct ether_header));
+    
+    size_t buffSize = size + (sizeof(struct ether_header));
     struct ether_header *eh = (struct ether_header *)sendbuf;
 
     memset(sendbuf, 0, buffSize);
@@ -153,29 +152,16 @@ static void reportArp(uint8_t *acc_buf, size_t size)
 
 void handleArpRequest(uint8_t *acc_buf, size_t size, int tunnelDev)
 {
-
+    
     // reportArp(acc_buf, size);
-
+    
+    int frame_length = 6 + 6 + 2 + ARP_HDRLEN;
     arp_hdr *sourceArpRequest = (arp_hdr *)(acc_buf + 6 + 6 + 2);
     arp_hdr arphdr_resp;
 
-    // int i, status, frame_length, sd, bytes;
-    // char *interface, *target, *src_ip;
     uint8_t *ether_frame;
-    // struct addrinfo hints, *res;
-    // struct sockaddr_in *ipv4;
-    // struct sockaddr_ll device;
-    // struct ifreq ifr;
+    ether_frame = allocate_ustrmem(frame_length);
 
-    // Allocate memory for various arrays.
-    // src_mac = allocate_ustrmem(6);
-    // dst_mac = allocate_ustrmem(6);
-    ether_frame = allocate_ustrmem(IP_MAXPACKET);
-    // interface = allocate_strmem(40);
-    // target = allocate_strmem(40);
-    // src_ip = allocate_strmem(INET_ADDRSTRLEN);
-
-    printf("###################### Arp: ");
     memcpy(&arphdr_resp.sender_mac, g_sourceInterfaceMac.ifr_hwaddr.sa_data, 6 * sizeof(uint8_t));
     memcpy(&arphdr_resp.sender_ip, sourceArpRequest->target_ip, 4 * sizeof(uint8_t));
     memcpy(&arphdr_resp.target_mac, sourceArpRequest->sender_mac, 6 * sizeof(uint8_t));
@@ -193,7 +179,6 @@ void handleArpRequest(uint8_t *acc_buf, size_t size, int tunnelDev)
     arphdr_resp.opcode = htons(ARPOP_RESPONSE);
 
     // Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (ARP header)
-    int frame_length = 6 + 6 + 2 + ARP_HDRLEN;
 
     // Destination and Source MAC addresses
     memcpy(ether_frame, sourceArpRequest->sender_mac, 6 * sizeof(uint8_t));
@@ -211,7 +196,7 @@ void handleArpRequest(uint8_t *acc_buf, size_t size, int tunnelDev)
 
     // reportArp(ether_frame, IP_MAXPACKET);
 
-    int res = send_network_packet(ether_frame, IP_MAXPACKET);
+    int res = send_network_packet(ether_frame, frame_length);
 
     free(ether_frame);
 }

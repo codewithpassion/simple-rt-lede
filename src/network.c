@@ -56,6 +56,16 @@ static int g_tun_fd = 0;
 static pthread_t g_tun_thread;
 static volatile bool g_tun_is_running = false;
 
+void _printIp(char *msg, void *addr)
+{
+    struct sockaddr_storage their_addr;
+    char sender[INET6_ADDRSTRLEN];
+
+    ((struct sockaddr_in *)&their_addr)->sin_addr.s_addr = addr;
+    inet_ntop(AF_INET, &((struct sockaddr_in *)&their_addr)->sin_addr, sender, sizeof sender);
+    printf("%s IP: %s", msg, sender);
+}
+
 static inline void dump_addr_info(uint32_t addr, size_t size)
 {
     uint32_t tmp = htonl(addr);
@@ -109,9 +119,18 @@ static void *tun_thread_proc(void *arg)
             {
                 handleArpRequest(acc_buf, nread, g_tun_fd);
             }
+            struct iphdr *iph = (struct iphdr *)(acc_buf + 14);
 
             // FROM DEVICE
-            // printf("#### Size: %i\n", nread);
+            // printf("#### Proto: %i ", iph->protocol);
+            // if (iph->protocol == 17) { //UDP
+            //     printf(" UDP ");
+            //     _printIp("Source", iph->saddr);
+            //     _printIp(" - Dest ", iph->daddr);
+            //     printf(" - S Port: %u", ((acc_buf[14 + 20]) << 8) + acc_buf[14 + 20 +1]); //ip header
+            //     printf(" - D Port: %u", ((acc_buf[14 + 20 +2]) << 8) + acc_buf[14 + 20 +3]); //ip header
+            //     printf("\n");
+            // }
             int headerLength = sizeof(struct ether_header);
             int size = nread - headerLength;
             uint8_t ipPackage[size];
