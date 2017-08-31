@@ -28,6 +28,8 @@
 #include "network.h"
 #include "utils.h"
 
+#include "networkmanager.h"
+
 typedef struct accessory_t
 {
     uint8_t ep_in;
@@ -125,6 +127,17 @@ static accessory_t *find_accessory_by_id(accessory_id_t id)
     return ret;
 }
 
+void printpacket(const char *msg, const unsigned char *p, size_t len)
+{
+    int i;
+    printf("%s len=%d ", msg, len);
+    for (i = 0; i < len; ++i)
+    {
+        printf("%02x", p[i]);
+    }
+    printf("\n");
+}
+
 static void accessory_worker_proc(accessory_t *acc)
 {
     uint8_t acc_buf[ACC_BUF_SIZE];
@@ -163,10 +176,27 @@ static void accessory_worker_proc(accessory_t *acc)
         if ((nread = read_usb_packet(acc->handle, acc->ep_in,
                                      acc_buf, sizeof(acc_buf))) > 0)
         {
-            if (send_network_packet(acc_buf, nread) < 0)
+            uint8_t sendBuffer[nread + sizeof(struct ether_header)];
+            ssize_t ethSize;
+            // printf("IP size: %i - ETH size: %i", nread, ethSize);
+            if ((ethSize = wrapIPpackageInEthernet(acc_buf, nread, &sendBuffer)) > 0)
             {
-                break;
+                printf("IP size: %i - ETH size: %i\n", nread, ethSize);
+                printpacket("ETH", &sendBuffer, ethSize);
+                if (send_network_packet(sendBuffer, ethSize) < 0)
+                {
+                    puts("x");
+                    break;
+                }
             }
+            else {
+                if (send_network_packet(acc_buf, nread) < 0)
+                {
+                    break;
+                }
+
+            }
+
         }
         else if (nread < 0)
         {

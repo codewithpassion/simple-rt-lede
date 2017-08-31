@@ -41,7 +41,7 @@
     (uint32_t)((d) << 0))
 
 #define SIMPLERT_NETWORK_ADDRESS \
-    SIMPLERT_NETWORK_ADDRESS_BUILDER(10, 1, 2, 0)
+    SIMPLERT_NETWORK_ADDRESS_BUILDER(10, 1, 1, 0)
 
 #define NETWORK_ADDRESS(addr) \
     ((addr)&0xffffff00)

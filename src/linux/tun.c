@@ -48,6 +48,7 @@ int tun_alloc(char *dev_name, size_t dev_name_size)
 
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
+    ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 
     if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0)
     {
