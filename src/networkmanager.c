@@ -10,10 +10,13 @@
 #include <netinet/ether.h>
 
 #include "networkmanager.h"
+#include "network.h"
 
 int g_haveSourceMac = 0;
 struct ifreq g_sourceInterfaceMac;
 struct ifreq g_destinationInterfaceMac;
+
+
 
 struct ifreq getAddrMac(interface) {
     puts("Getting MAC");
@@ -101,3 +104,162 @@ ssize_t wrapIPpackageInEthernet(uint8_t *acc_buf, size_t size, uint8_t *sendbuf)
     return buffSize;
 }
 
+static void reportArp(uint8_t *acc_buf, size_t size)
+{
+    // ++++++++++++
+    int i;
+    uint8_t *ether_frame = acc_buf;
+    arp_hdr *arphdr = (arp_hdr *)(acc_buf + 6 + 6 + 2);
+    printf("\nEthernet frame header:\n");
+    printf("Destination MAC (this node): ");
+    for (i = 0; i < 5; i++)
+    {
+        printf("%02x:", ether_frame[i]);
+    }
+    printf("%02x\n", ether_frame[5]);
+    printf("Source MAC: ");
+    for (i = 0; i < 5; i++)
+    {
+        printf("%02x:", ether_frame[i + 6]);
+    }
+    printf("%02x\n", ether_frame[11]);
+    // Next is ethernet type code (ETH_P_ARP for ARP).
+    // http://www.iana.org/assignments/ethernet-numbers
+    printf("Ethernet type code (2054 = ARP): %u\n", ((ether_frame[12]) << 8) + ether_frame[13]);
+    printf("Ethernet data (ARP header):\n");
+    printf("Hardware type (1 = ethernet (10 Mb)): %u\n", ntohs(arphdr->htype));
+    printf("Protocol type (2048 for IPv4 addresses): %u\n", ntohs(arphdr->ptype));
+    printf("Hardware (MAC) address length (bytes): %u\n", arphdr->hlen);
+    printf("Protocol (IPv4) address length (bytes): %u\n", arphdr->plen);
+    printf("Opcode (2 = ARP reply): %u\n", ntohs(arphdr->opcode));
+    printf("Sender hardware (MAC) address: ");
+    for (i = 0; i < 5; i++)
+    {
+        printf("%02x:", arphdr->sender_mac[i]);
+    }
+    printf("%02x\n", arphdr->sender_mac[5]);
+    printf("Sender protocol (IPv4) address: %u.%u.%u.%u\n",
+           arphdr->sender_ip[0], arphdr->sender_ip[1], arphdr->sender_ip[2], arphdr->sender_ip[3]);
+    printf("Target (this node) hardware (MAC) address: ");
+    for (i = 0; i < 5; i++)
+    {
+        printf("%02x:", arphdr->target_mac[i]);
+    }
+    printf("%02x\n", arphdr->target_mac[5]);
+    printf("Target (this node) protocol (IPv4) address: %u.%u.%u.%u\n",
+           arphdr->target_ip[0], arphdr->target_ip[1], arphdr->target_ip[2], arphdr->target_ip[3]);
+}
+
+
+void handleArpRequest(uint8_t *acc_buf, size_t size, int tunnelDev)
+{
+
+    // reportArp(acc_buf, size);
+
+    arp_hdr *sourceArpRequest = (arp_hdr *)(acc_buf + 6 + 6 + 2);
+    arp_hdr arphdr_resp;
+
+    // int i, status, frame_length, sd, bytes;
+    // char *interface, *target, *src_ip;
+    uint8_t *ether_frame;
+    // struct addrinfo hints, *res;
+    // struct sockaddr_in *ipv4;
+    // struct sockaddr_ll device;
+    // struct ifreq ifr;
+
+    // Allocate memory for various arrays.
+    // src_mac = allocate_ustrmem(6);
+    // dst_mac = allocate_ustrmem(6);
+    ether_frame = allocate_ustrmem(IP_MAXPACKET);
+    // interface = allocate_strmem(40);
+    // target = allocate_strmem(40);
+    // src_ip = allocate_strmem(INET_ADDRSTRLEN);
+
+    printf("###################### Arp: ");
+    memcpy(&arphdr_resp.sender_mac, g_sourceInterfaceMac.ifr_hwaddr.sa_data, 6 * sizeof(uint8_t));
+    memcpy(&arphdr_resp.sender_ip, sourceArpRequest->target_ip, 4 * sizeof(uint8_t));
+    memcpy(&arphdr_resp.target_mac, sourceArpRequest->sender_mac, 6 * sizeof(uint8_t));
+    memcpy(&arphdr_resp.target_ip, sourceArpRequest->sender_ip, 4 * sizeof(uint8_t));
+
+    // for (i = 0; i < 6; i++)
+    // {
+    //     printf("%02x:", dst_mac[i]);
+    // }
+    // printf("\n");
+    arphdr_resp.htype = htons(1);
+    arphdr_resp.ptype = htons(ETH_P_IP);
+    arphdr_resp.hlen = 6;
+    arphdr_resp.plen = 4;
+    arphdr_resp.opcode = htons(ARPOP_RESPONSE);
+
+    // Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (ARP header)
+    int frame_length = 6 + 6 + 2 + ARP_HDRLEN;
+
+    // Destination and Source MAC addresses
+    memcpy(ether_frame, sourceArpRequest->sender_mac, 6 * sizeof(uint8_t));
+    memcpy(ether_frame + 6, g_sourceInterfaceMac.ifr_hwaddr.sa_data, 6 * sizeof(uint8_t));
+
+    // Next is ethernet type code (ETH_P_ARP for ARP).
+    // http://www.iana.org/assignments/ethernet-numbers
+    ether_frame[12] = ETH_P_ARP / 256;
+    ether_frame[13] = ETH_P_ARP % 256;
+
+    // Next is ethernet frame data (ARP header).
+
+    // ARP header
+    memcpy(ether_frame + ETH_HDRLEN, &arphdr_resp, ARP_HDRLEN * sizeof(uint8_t));
+
+    // reportArp(ether_frame, IP_MAXPACKET);
+
+    int res = send_network_packet(ether_frame, IP_MAXPACKET);
+
+    free(ether_frame);
+}
+
+// Allocate memory for an array of chars.
+char * allocate_strmem(int len)
+{
+    void *tmp;
+
+    if (len <= 0)
+    {
+        fprintf(stderr, "ERROR: Cannot allocate memory because len = %i in allocate_strmem().\n", len);
+        exit(EXIT_FAILURE);
+    }
+
+    tmp = (char *)malloc(len * sizeof(char));
+    if (tmp != NULL)
+    {
+        memset(tmp, 0, len * sizeof(char));
+        return (tmp);
+    }
+    else
+    {
+        fprintf(stderr, "ERROR: Cannot allocate memory for array allocate_strmem().\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+// Allocate memory for an array of unsigned chars.
+uint8_t * allocate_ustrmem(int len)
+{
+    void *tmp;
+
+    if (len <= 0)
+    {
+        fprintf(stderr, "ERROR: Cannot allocate memory because len = %i in allocate_ustrmem().\n", len);
+        exit(EXIT_FAILURE);
+    }
+
+    tmp = (uint8_t *)malloc(len * sizeof(uint8_t));
+    if (tmp != NULL)
+    {
+        memset(tmp, 0, len * sizeof(uint8_t));
+        return (tmp);
+    }
+    else
+    {
+        fprintf(stderr, "ERROR: Cannot allocate memory for array allocate_ustrmem().\n");
+        exit(EXIT_FAILURE);
+    }
+}

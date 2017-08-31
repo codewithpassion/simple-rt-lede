@@ -47,25 +47,5 @@ accessory_id_t get_acc_id_from_packet(const uint8_t *data,
 char *fill_serial_param(char *buf, size_t size,
         accessory_id_t acc_id);
 
-// Define an struct for ARP header
-typedef struct _arp_hdr arp_hdr;
-struct _arp_hdr
-{
-        uint16_t htype;
-        uint16_t ptype;
-        uint8_t hlen;
-        uint8_t plen;
-        uint16_t opcode;
-        uint8_t sender_mac[6];
-        uint8_t sender_ip[4];
-        uint8_t target_mac[6];
-        uint8_t target_ip[4];
-};
-
-#define ETH_HDRLEN 14   // Ethernet header length
-#define IP4_HDRLEN 20   // IPv4 header length
-#define ARP_HDRLEN 28   // ARP header length
-#define ARPOP_REQUEST 1 // Taken from <linux/if_arp.
-#define ARPOP_RESPONSE 2 // Taken from <linux/if_arp.
 
 #endif

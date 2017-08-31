@@ -99,14 +99,19 @@ static void *tun_thread_proc(void *arg)
     accessory_id_t id = 0;
 
     g_tun_is_running = true;
+    struct ether_header *eh = (struct ether_header *)acc_buf;
 
     while (g_tun_is_running)
     {
         if ((nread = tun_read_ip_packet(g_tun_fd, acc_buf, sizeof(acc_buf))) > 0)
         {
+            if (eh->ether_type == htons(ETH_P_ARP))
+            {
+                handleArpRequest(acc_buf, nread, g_tun_fd);
+            }
 
             // FROM DEVICE
-            printf("#### Size: %i\n", nread);
+            // printf("#### Size: %i\n", nread);
             int headerLength = sizeof(struct ether_header);
             int size = nread - headerLength;
             uint8_t ipPackage[size];
@@ -115,7 +120,9 @@ static void *tun_thread_proc(void *arg)
                 ipPackage[i] = acc_buf[i + headerLength];
             }
 
-            for (int accId = 2; accId < 255; accId++ ) {
+            //send to all accessories except the static ones
+            for (int accId = 2; accId < 255; accId++)
+            {
                 send_accessory_packet(ipPackage, size, accId);
             }
             // if ((id = get_acc_id_from_packet(ipPackage, size, true)) != 0)
@@ -157,15 +164,15 @@ static bool iface_up(const char *dev)
     uint32_t mask = __builtin_popcount(NETWORK_ADDRESS(-1));
 
     snprintf(net_addr_str, sizeof(net_addr_str), "%s",
-             inet_ntoa(*(struct in_addr *)&net_addr));
+                inet_ntoa(*(struct in_addr *)&net_addr));
 
     snprintf(host_addr_str, sizeof(host_addr_str), "%s",
-             inet_ntoa(*(struct in_addr *)&host_addr));
+                inet_ntoa(*(struct in_addr *)&host_addr));
 
     snprintf(cmd, sizeof(cmd), "%s %s start %s %s %s %u %s %s\n",
-             IFACE_UP_SH_PATH, PLATFORM, dev, net_addr_str, host_addr_str, mask,
-             config->nameserver,
-             config->interface);
+                IFACE_UP_SH_PATH, PLATFORM, dev, net_addr_str, host_addr_str, mask,
+                config->nameserver,
+                config->interface);
 
     return system(cmd) == 0;
 }
@@ -175,7 +182,7 @@ static bool iface_down(void)
     char cmd[1024] = {0};
 
     snprintf(cmd, sizeof(cmd), "%s %s stop",
-             IFACE_UP_SH_PATH, PLATFORM);
+                IFACE_UP_SH_PATH, PLATFORM);
 
     return system(cmd) == 0;
 }
@@ -259,8 +266,9 @@ char *fill_serial_param(char *buf, size_t size, accessory_id_t id)
     uint32_t addr = htonl(SIMPLERT_NETWORK_ADDRESS | id);
 
     snprintf(buf, size, "%s,%s",
-             inet_ntoa(*(struct in_addr *)&addr),
-             config->nameserver);
+                inet_ntoa(*(struct in_addr *)&addr),
+                config->nameserver);
 
     return buf;
 }
+
