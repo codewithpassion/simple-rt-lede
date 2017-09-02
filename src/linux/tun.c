@@ -25,6 +25,7 @@
 #include <netinet/ip.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
+#include <linux/if_arp.h>
 #include <sys/ioctl.h>
 
 static const char clonedev[] = "/dev/net/tun";
@@ -45,7 +46,8 @@ int tun_alloc(char *dev_name, size_t dev_name_size)
         perror("error open tun");
         return fd;
     }
-
+    
+    char mac_char[] = "7e:bf:4c:65:36:bb";
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
@@ -59,6 +61,22 @@ int tun_alloc(char *dev_name, size_t dev_name_size)
 
     memset(dev_name, 0, dev_name_size);
     strncpy(dev_name, ifr.ifr_name, dev_name_size - 1);
+
+
+    sscanf(mac_char, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+           &ifr.ifr_hwaddr.sa_data[0],
+           &ifr.ifr_hwaddr.sa_data[1],
+           &ifr.ifr_hwaddr.sa_data[2],
+           &ifr.ifr_hwaddr.sa_data[3],
+           &ifr.ifr_hwaddr.sa_data[4],
+           &ifr.ifr_hwaddr.sa_data[5]);
+    ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+    if ((err = ioctl(fd, SIOCSIFHWADDR, (void *)&ifr)) < 0)
+    {
+        close(fd);
+        perror("error setting HWADDR on tun");
+        return err;
+    }
 
     return fd;
 }
